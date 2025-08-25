@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: zenwebapi9
+  description: My test app
+  annotations:
+    github.com/project-slug: zensaridp/zenwebapi9
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/developers

@@ -1,0 +1,89 @@
+name: Infrastructure Provisioning
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  terraform:
+    name: 'Terraform Infrastructure'
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_project_id: dev-zephyr-352206
+      TF_VAR_region: asia-south1
+      TF_VAR_component_id: zenwebapi9
+      TF_VAR_database_type: mysql
+      TF_VAR_database_name: app_db
+      TF_VAR_database_username: app_user
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./terraform
+
+    - name: Terraform Validate
+      run: terraform validate
+      working-directory: ./terraform
+
+    - name: Terraform Plan
+      run: terraform plan -no-color
+      working-directory: ./terraform
+
+    - name: Terraform Apply (on push)
+      if: github.event_name == 'push'
+      run: terraform apply -auto-approve
+      working-directory: ./terraform
+
+    - name: Terraform Apply (manual)
+      if: github.event.inputs.action == 'apply'
+      run: terraform apply -auto-approve
+      working-directory: ./terraform
+
+    - name: Terraform Destroy
+      if: github.event.inputs.action == 'destroy'
+      run: terraform destroy -auto-approve
+      working-directory: ./terraform
+
+    - name: Output Summary
+      run: |
+        echo "## Infrastructure Provisioning Summary" >> $GITHUB_STEP_SUMMARY
+        ACTION="${{ github.event.inputs.action }}"
+        if [ -z "$ACTION" ]; then
+          echo "**Action:** auto-apply" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "**Action:** $ACTION" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "**Region:** asia-south1" >> $GITHUB_STEP_SUMMARY
+        echo "**Database Type:** mysql" >> $GITHUB_STEP_SUMMARY
+        echo "**Database Name:** app_db" >> $GITHUB_STEP_SUMMARY
+        echo "**Component:** zenwebapi9" >> $GITHUB_STEP_SUMMARY
